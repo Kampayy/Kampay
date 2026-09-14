@@ -9,6 +9,11 @@ KamPay credit market.
 
 No trust assumptions. No chasing invoices. No two-week settlement windows.
 
+> **Status:** early development. The payroll, escrow, and credit contracts are written, tested
+> (57 tests), and building to WASM; the lending contract is designed but not yet implemented, and
+> nothing has been deployed to mainnet or audited. See the [roadmap](#roadmap) for what is done and
+> what is not.
+
 ---
 
 ## Table of Contents
@@ -27,6 +32,7 @@ No trust assumptions. No chasing invoices. No two-week settlement windows.
 - [Getting Started](#getting-started)
 - [Contract Interfaces](#contract-interfaces)
 - [Security Model](#security-model)
+- [Testing](#testing)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -105,7 +111,8 @@ Trust-minimized payments for freelancers, agencies, and one-off contracts.
 
 - **Deliverable-scoped.** Split a contract into milestones, each with its own amount and deadline.
 - **Locked at signing.** The full contract value is escrowed before work begins.
-- **Release conditions.** Client approval, deadline expiry with auto-release, or an oracle attestation.
+- **Release conditions.** Client approval, or deadline expiry with auto-release once the grace
+  period lapses. Oracle-attested release is planned, not built.
 - **Partial release.** Approve milestone 1 and pay for it while milestone 2 is still in progress.
 - **Cancellation terms.** Kill-fee and refund splits are agreed at signing and enforced by the contract.
 
@@ -134,21 +141,35 @@ Every settled payment, honored deadline, resolved dispute, and repaid loan write
 | --- | --- | --- |
 | **Payment history** | 35% | Payments received or made on time, without dispute |
 | **Tenure** | 20% | Age of the account's first settled payment |
-| **Income consistency** | 15% | Volatility and continuity of inbound payment volume |
-| **Counterparty quality** | 10% | Credit standing of the entities you transact with |
-| **Dispute record** | 10% | Frequency and outcome of disputes raised against you |
+| **Income consistency** | 15% | Share of elapsed 30-day periods that contained a payment |
+| **Counterparty quality** | 10% | Half counterparty diversity, half their own credit standing |
+| **Dispute record** | 10% | Disputes *lost* — being disputed and vindicated costs nothing |
 | **Loan repayment** | 10% | On-time repayment of prior KamPay loans |
+
+An account stays **Unrated** until it has at least three settled payments, so a
+fresh address cannot coast on tenure alone. Scores map to tiers — Bronze,
+Silver, Gold, Platinum — which gate lending terms.
 
 Properties that matter:
 
 - **Portable.** The record lives on Stellar, not in KamPay's database. Any protocol can read it.
-- **Verifiable.** Every input is a public on-chain event; the score is recomputable from scratch.
+- **Recomputable.** Only counters are stored, never a cached score. Every input is a public event
+  and every weight is a constant in [`scoring.rs`](contract/contracts/credit/src/scoring.rs), so a
+  third party can derive the same number from scratch. `breakdown_of()` returns each component, so
+  a user can see what is holding their rating back instead of getting an opaque verdict.
 - **Two-sided.** Employers are scored too. A company that consistently pays late is visible to
   contributors before they sign.
-- **Privacy-aware.** The raw score is public; underlying income figures can be disclosed selectively
-  via signed attestations rather than exposed in full.
-- **Sybil-resistant.** Score accrues from *counterparty-weighted* volume, so wash-paying yourself
-  between fresh accounts earns nothing.
+- **Charitable to newcomers.** A counterparty with too little history to rate counts as *neutral*,
+  not zero — working with new clients must not look like working with bad ones.
+- **Volume-blind.** Total volume is tracked for display and loan sizing but is deliberately not a
+  scoring input. Moving more money cannot buy a rating.
+
+On sybil resistance, honestly: counterparty diversity is half the graph score, so a closed loop of
+two accounts paying each other caps out low however much volume they push through. That is a brake,
+not a wall. A determined attacker can fund several accounts and pay themselves; what it costs them
+is real capital in motion and counterparties whose own standing never rises above neutral, so the
+ceiling is mediocre rather than good. The limitation is documented in the contract rather than
+papered over.
 
 ### 5. Lending Market
 
@@ -190,24 +211,38 @@ across ecosystems. Multi-chain reads may come later; the ledger of record stays 
 
 ### Contracts (Soroban / Rust)
 
-| Contract | Responsibility |
-| --- | --- |
-| `payroll` | Streams, cycles, batch disbursement, pause/amend/terminate |
-| `escrow` | Milestone definition, funding, conditional release, cancellation |
-| `dispute` | Freeze, grace-period logic, arbiter and panel resolution |
-| `credit` | `CreditRecord` storage, score computation, attestation issuance |
-| `lending` | Loan origination, lender pools, repayment hooks, liquidation |
-| `registry` | Contract discovery, upgrade authority, protocol parameters |
+Shipped, tested, and building to WASM today:
 
-Contracts are composed, not monolithic: `payroll` and `escrow` emit settlement events that `credit`
-consumes; `lending` reads `credit` and installs a repayment hook back into `payroll`.
+| Crate | Responsibility |
+| --- | --- |
+| [`payroll`](contract/contracts/payroll) | Salary streams, funding, withdrawals, pause/resume/cancel, batch disbursement |
+| [`escrow`](contract/contracts/escrow) | Milestone definition, funding, conditional release, grace-period auto-claim, disputes |
+| [`credit`](contract/contracts/credit) | Credit records, score computation, reporter allowlist |
+
+Planned, not yet written:
+
+| Crate | Responsibility |
+| --- | --- |
+| `lending` | Loan origination, lender pools, payroll repayment hooks, liquidation |
+| `registry` | Contract discovery, timelocked upgrade authority, protocol parameters |
+
+Dispute handling currently lives inside `escrow` rather than in a separate
+crate; it moves out when staked juror panels land.
+
+Contracts are composed, not monolithic: `payroll` and `escrow` emit settlement
+events that `credit` consumes; `lending` will read `credit` and install a
+repayment hook back into `payroll`.
 
 ### Frontend
 
+Next.js 16 (App Router) with TypeScript and Tailwind v4. The marketing homepage
+is built; the authenticated surfaces are next:
+
+- Marketing homepage — **built**
 - Employer console — fund vaults, run payroll, open escrows, manage disputes
 - Contributor dashboard — earnings, withdrawals, credit score, loan offers
 - Lender terminal — supply capital, pick risk tranches, monitor the book
-- Freighter / Albedo / xBull wallet support, plus Stellar's passkey-based smart wallets
+- Freighter / Albedo / xBull wallet support, plus Stellar's passkey smart wallets
 
 ---
 
@@ -215,57 +250,71 @@ consumes; `lending` reads `credit` and installs a repayment hook back into `payr
 
 ```
 kampay/
-├── contract/          # Soroban smart contracts (Rust)
-│   ├── payroll/
-│   ├── escrow/
-│   ├── dispute/
-│   ├── credit/
-│   ├── lending/
-│   └── registry/
-├── Frontend/          # Web application
+├── contract/                   # Soroban workspace (Rust)
+│   ├── Cargo.toml              # workspace manifest, shared release profile
+│   ├── rust-toolchain.toml     # pins the wasm32v1-none target
+│   └── contracts/
+│       ├── payroll/            # salary streams + batch pay
+│       ├── escrow/             # milestone escrow + disputes
+│       └── credit/             # credit records + scoring
+├── Frontend/                   # Next.js 16 app
+│   └── src/
+│       ├── app/                # App Router entry, layout, global tokens
+│       └── components/         # homepage sections and site chrome
 └── README.md
 ```
-
----
 
 ## Getting Started
 
 ### Prerequisites
 
 ```bash
-# Rust + the wasm target
-rustup target add wasm32-unknown-unknown
+# Rust plus the Soroban wasm target
+rustup target add wasm32v1-none
 
-# Stellar CLI
+# Stellar CLI (v23 or later)
 cargo install --locked stellar-cli
 
-# Node (frontend)
 node --version   # v20 or later
-```
-
-### Set up a testnet identity
-
-```bash
-stellar keys generate --global deployer --network testnet
-stellar keys fund deployer --network testnet
-stellar keys address deployer
 ```
 
 ### Build and test the contracts
 
 ```bash
 cd contract
-stellar contract build
-cargo test
+cargo test              # 57 tests across the three crates
+stellar contract build  # -> target/wasm32v1-none/release/*.wasm
+```
+
+Lints and formatting are expected to be clean:
+
+```bash
+cargo clippy --all-targets
+cargo fmt --check
 ```
 
 ### Deploy to testnet
 
 ```bash
+stellar keys generate --global deployer --network testnet
+stellar keys fund deployer --network testnet
+
 stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/payroll.wasm \
+  --wasm target/wasm32v1-none/release/payroll.wasm \
   --source deployer \
   --network testnet
+```
+
+The `credit` contract needs one extra step after deployment — it only accepts
+history from an allowlist, so initialise it and register the contracts that are
+permitted to report:
+
+```bash
+stellar contract invoke --id <CREDIT_ID> --source deployer --network testnet \
+  -- initialize --admin <ADMIN_ADDRESS>
+
+stellar contract invoke --id <CREDIT_ID> --source deployer --network testnet \
+  -- set_reporter --reporter <PAYROLL_ID> --authorized true
 ```
 
 ### Run the frontend
@@ -273,56 +322,74 @@ stellar contract deploy \
 ```bash
 cd Frontend
 npm install
-cp .env.example .env.local   # set contract IDs and network passphrase
-npm run dev
+npm run dev     # http://localhost:3000
 ```
 
----
+```bash
+npm run build   # production build
+npm run lint
+```
 
 ## Contract Interfaces
 
-Illustrative signatures — see each crate for the authoritative interface.
+Actual signatures, abridged. See each crate for the full surface and its errors.
 
-**Payroll**
+**Payroll** — [`contract/contracts/payroll`](contract/contracts/payroll)
 
 ```rust
 fn create_stream(employer: Address, worker: Address, token: Address,
-                 rate_per_second: i128, start: u64, end: u64) -> u64;
-fn fund_stream(stream_id: u64, amount: i128);
-fn withdraw(stream_id: u64, worker: Address) -> i128;
-fn batch_pay(employer: Address, payees: Vec<(Address, i128)>);
-fn pause_stream(stream_id: u64, caller: Address);
+                 rate_per_second: i128, start: u64, end: u64) -> Result<u64, Error>;
+fn fund(stream_id: u64, from: Address, amount: i128) -> Result<(), Error>;
+fn withdraw(stream_id: u64) -> Result<i128, Error>;
+fn pause(stream_id: u64) -> Result<(), Error>;
+fn resume(stream_id: u64) -> Result<(), Error>;
+fn cancel(stream_id: u64) -> Result<(), Error>;
+fn batch_pay(employer: Address, token: Address,
+             payments: Vec<Payment>) -> Result<i128, Error>;
+
+// views
+fn withdrawable(stream_id: u64) -> Result<i128, Error>;
+fn runway(stream_id: u64) -> Result<u64, Error>;   // funded seconds remaining
 ```
 
-**Escrow**
+**Escrow** — [`contract/contracts/escrow`](contract/contracts/escrow)
 
 ```rust
 fn create_escrow(client: Address, provider: Address, token: Address,
-                 milestones: Vec<Milestone>, arbiter: Option<Address>) -> u64;
-fn fund(escrow_id: u64);
-fn approve_milestone(escrow_id: u64, index: u32, client: Address);
-fn claim_expired(escrow_id: u64, index: u32);   // auto-release after grace period
-fn raise_dispute(escrow_id: u64, index: u32, caller: Address);
+                 milestones: Vec<Milestone>,
+                 arbiter: Option<Address>) -> Result<u64, Error>;
+fn fund(escrow_id: u64) -> Result<i128, Error>;
+fn approve_milestone(escrow_id: u64, index: u32) -> Result<i128, Error>;
+fn claim_expired(escrow_id: u64, index: u32) -> Result<i128, Error>;
+fn raise_dispute(escrow_id: u64, index: u32, by: Address) -> Result<(), Error>;
+fn resolve_dispute(escrow_id: u64, index: u32, to_provider: i128) -> Result<(), Error>;
+fn cancel(escrow_id: u64) -> Result<i128, Error>;   // requires both signatures
+
+// views
+fn is_claimable(escrow_id: u64, index: u32) -> Result<bool, Error>;
+fn locked_value(escrow_id: u64) -> Result<i128, Error>;
 ```
 
-**Credit**
+**Credit** — [`contract/contracts/credit`](contract/contracts/credit)
 
 ```rust
-fn score_of(account: Address) -> u32;                 // 0–1000
-fn record_of(account: Address) -> CreditRecord;
-fn attest(account: Address, fields: Vec<Field>) -> Attestation;
+fn initialize(admin: Address) -> Result<(), Error>;
+fn set_reporter(reporter: Address, authorized: bool) -> Result<(), Error>;
+
+// reporting — allowlisted contracts only
+fn record_payment(reporter: Address, payer: Address, payee: Address,
+                  amount: i128, on_time: bool) -> Result<(), Error>;
+fn record_dispute(reporter: Address, account: Address, lost: bool) -> Result<(), Error>;
+fn record_loan(reporter: Address, borrower: Address, repaid: bool) -> Result<(), Error>;
+
+// views
+fn score_of(account: Address) -> u32;                  // 0-1000
+fn breakdown_of(account: Address) -> ScoreBreakdown;   // per-component scores
+fn tier_of(account: Address) -> Tier;
+fn record_of(account: Address) -> CreditRecord;        // the raw counters
 ```
 
-**Lending**
-
-```rust
-fn quote(borrower: Address, amount: i128, term_days: u32) -> LoanTerms;
-fn borrow(borrower: Address, amount: i128, term_days: u32) -> u64;
-fn repay(loan_id: u64, amount: i128);
-fn supply(lender: Address, tranche: RiskTier, amount: i128);
-```
-
----
+Selective-disclosure attestations are on the roadmap and not yet implemented.
 
 ## Security Model
 
@@ -335,26 +402,62 @@ fn supply(lender: Address, tranche: RiskTier, amount: i128);
 - **Storage TTL is managed.** Long-lived records (credit history, active loans) are explicitly
   extended so critical state cannot expire out from under a user.
 - **Oracles are minimized.** Release conditions prefer on-chain facts and party signatures over
-  external feeds. Where an oracle is used, it is named at contract creation and cannot be swapped.
+  external feeds. An escrow's arbiter is named at creation and cannot be swapped afterwards, so
+  neither side can install a friendly judge mid-contract.
+- **Credit history is allowlisted.** Only reporter contracts registered by the admin can write to a
+  `CreditRecord`. Everything else is read-only.
 - **Not yet audited.** KamPay is pre-audit software. Do not use it with production funds.
+
+---
+
+## Testing
+
+```bash
+cd contract && cargo test
+```
+
+| Crate | Tests | Covers |
+| --- | --- | --- |
+| `payroll` | 15 | Linear accrual, funding caps, pause semantics, cancellation splits, end-date bounding, batch pay, every error path |
+| `escrow` | 19 | Funding, partial release, grace-period expiry, dispute freezing, arbiter splits, mutual cancellation, every error path |
+| `credit` | 23 | Score gating, two-sided recording, tenure saturation, consistency, counterparty diversity, dispute and loan effects, reporter authorization |
+
+Some tests exist specifically to pin down behaviour that is easy to get backwards:
+
+- `accrual_is_capped_by_what_was_actually_deposited` — an underfunded stream cannot promise more
+  than it holds.
+- `paused_time_never_accrues` — pausing must not silently back-pay when resumed.
+- `a_closed_payment_loop_scores_worse_than_diversified_history` — the sybil brake actually bites.
+  An earlier version of the scoring model failed this test by rewarding a two-account loop over an
+  honest worker; the metric was reworked rather than the assertion weakened.
+- `volume_is_tracked_but_never_scored` — moving more money must not buy a rating.
+- `the_score_is_recomputable_from_the_public_record` — the published weights reproduce the
+  published total.
 
 ---
 
 ## Roadmap
 
 **Phase 1 — Payments**
-- [ ] Payroll streams and batch disbursement
-- [ ] Milestone escrow with conditional release
+- [x] Payroll streams with per-second accrual, pause/resume, and early settlement
+- [x] Batch disbursement for whole-team runs
+- [x] Milestone escrow with conditional release
+- [x] Marketing homepage
 - [ ] Employer console and contributor dashboard
+- [ ] Wallet integration (Freighter, Albedo, xBull)
+- [ ] Testnet deployment with published contract IDs
 
 **Phase 2 — Trust**
-- [ ] Grace periods and dispute freezing
-- [ ] Arbiter resolution
+- [x] Grace periods and provider auto-claim
+- [x] Dispute freezing and arbiter resolution
 - [ ] Staked juror panels for high-value contracts
+- [ ] Extract dispute logic into its own crate
 
 **Phase 3 — Credit**
-- [ ] `CreditRecord` and score computation
-- [ ] Two-sided (employer and contributor) scoring
+- [x] `CreditRecord` counters and score computation
+- [x] Two-sided scoring for employers and contributors
+- [x] Per-component breakdown so a score can be explained
+- [ ] Wire payroll and escrow settlement into the credit contract as reporters
 - [ ] Selective-disclosure attestations
 
 **Phase 4 — Lending**
@@ -367,8 +470,7 @@ fn supply(lender: Address, tranche: RiskTier, amount: i128);
 - [ ] Stellar Anchor integrations for local-currency off-ramps
 - [ ] Passkey smart wallets for onboarding without seed phrases
 - [ ] Public credit-record SDK so other protocols can consume KamPay scores
-
----
+- [ ] Third-party security audit
 
 ## Contributing
 
@@ -376,8 +478,12 @@ Contributions are welcome.
 
 1. Fork the repo and branch from `main`.
 2. Keep contract changes accompanied by tests — `cargo test` must pass.
-3. Run `cargo fmt` and `cargo clippy` before opening a PR.
-4. Describe the security implications of any change to fund custody or scoring logic.
+3. Run `cargo fmt` and `cargo clippy --all-targets` before opening a PR; both are expected clean.
+4. For frontend changes, `npm run build` and `npm run lint` must pass.
+5. Describe the security implications of any change to fund custody or scoring logic.
+
+If you change a scoring weight in `scoring.rs`, update the table in this README and the two places
+the frontend mirrors it — the homepage credit card and the credit section.
 
 For substantial features, open an issue to discuss the design first.
 
