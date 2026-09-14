@@ -1,26 +1,116 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ---------------------------------------------------------------- palette
+   One set of semantic tokens, redefined for dark mode. Components only ever
+   reference the semantic name, so the two themes cannot drift apart. */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --canvas: #fbfbf9;
+  --surface: #ffffff;
+  --surface-sunken: #f4f4f0;
+  --line: #e3e3dc;
+  --line-strong: #cfcfc5;
+
+  --ink: #13161a;
+  --ink-muted: #585e67;
+  --ink-faint: #868d97;
+
+  /* Money in motion. */
+  --brand: #0b7a4f;
+  --brand-hover: #096440;
+  --brand-ink: #ffffff;
+  --brand-wash: #e8f4ee;
+
+  /* Credit and scoring. */
+  --accent: #a4611a;
+  --accent-wash: #fbf1e3;
+
+  --danger: #a52f2f;
+
+  --shadow-card: 0 1px 2px rgb(19 22 26 / 0.05);
+  --shadow-lift: 0 12px 32px -12px rgb(19 22 26 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --canvas: #0a0c0f;
+    --surface: #13171c;
+    --surface-sunken: #0f1216;
+    --line: #232830;
+    --line-strong: #333a45;
+
+    --ink: #eef1f5;
+    --ink-muted: #98a1ad;
+    --ink-faint: #6b7481;
+
+    --brand: #35d391;
+    --brand-hover: #55e0a6;
+    --brand-ink: #05231a;
+    --brand-wash: #0f2a21;
+
+    --accent: #e6a851;
+    --accent-wash: #2a2113;
+
+    --danger: #e07070;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lift: 0 12px 32px -12px rgb(0 0 0 / 0.7);
   }
 }
 
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-faint: var(--ink-faint);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-wash: var(--brand-wash);
+
+  --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+/* Respect users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible focus for keyboard users, on every interactive element. */
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Faint grid, used behind the hero. */
+.grid-backdrop {
+  background-image:
+    linear-gradient(to right, var(--line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 20%, transparent 75%);
 }
