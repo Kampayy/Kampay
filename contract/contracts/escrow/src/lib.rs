@@ -101,11 +101,8 @@ impl EscrowContract {
         }
 
         let total = total_value(&escrow);
-        token::Client::new(&env, &escrow.token).transfer(
-            &escrow.client,
-            &env.current_contract_address(),
-            &total,
-        );
+        let contract = env.current_contract_address();
+        token::Client::new(&env, &escrow.token).transfer(&escrow.client, &contract, &total);
 
         escrow.funded = total;
         escrow.status = EscrowStatus::Active;
@@ -255,17 +252,18 @@ impl EscrowContract {
         }
 
         if refund > 0 && escrow.funded > 0 {
-            token::Client::new(&env, &escrow.token).transfer(
-                &env.current_contract_address(),
-                &escrow.client,
-                &refund,
-            );
+            let contract = env.current_contract_address();
+            token::Client::new(&env, &escrow.token).transfer(&contract, &escrow.client, &refund);
         }
 
         escrow.status = EscrowStatus::Cancelled;
         save_escrow(&env, escrow_id, &escrow);
 
-        EscrowCancelled { escrow_id, refunded: refund }.publish(&env);
+        EscrowCancelled {
+            escrow_id,
+            refunded: refund,
+        }
+        .publish(&env);
 
         Ok(refund)
     }
@@ -338,11 +336,8 @@ fn release(
     }
 
     let amount = milestone.amount;
-    token::Client::new(env, &escrow.token).transfer(
-        &env.current_contract_address(),
-        &escrow.provider,
-        &amount,
-    );
+    let contract = env.current_contract_address();
+    token::Client::new(env, &escrow.token).transfer(&contract, &escrow.provider, &amount);
 
     milestone.status = MilestoneStatus::Released;
     escrow.milestones.set(index, milestone);
@@ -364,9 +359,10 @@ fn release(
 
 /// Mark the agreement complete once no milestone is still open.
 fn settle_if_complete(escrow: &mut Escrow) {
-    let open = escrow.milestones.iter().any(|m| {
-        m.status == MilestoneStatus::Pending || m.status == MilestoneStatus::Disputed
-    });
+    let open = escrow
+        .milestones
+        .iter()
+        .any(|m| m.status == MilestoneStatus::Pending || m.status == MilestoneStatus::Disputed);
     if !open {
         escrow.status = EscrowStatus::Completed;
     }
@@ -377,10 +373,7 @@ fn total_value(escrow: &Escrow) -> i128 {
 }
 
 fn milestone_at(escrow: &Escrow, index: u32) -> Result<Milestone, Error> {
-    escrow
-        .milestones
-        .get(index)
-        .ok_or(Error::MilestoneNotFound)
+    escrow.milestones.get(index).ok_or(Error::MilestoneNotFound)
 }
 
 fn next_escrow_id(env: &Env) -> u64 {

@@ -144,7 +144,11 @@ fn cancel_splits_funds_between_worker_and_employer() {
     f.advance(3_000);
     f.client.cancel(&id);
 
-    assert_eq!(f.token.balance(&f.worker), 3_000, "worker paid what accrued");
+    assert_eq!(
+        f.token.balance(&f.worker),
+        3_000,
+        "worker paid what accrued"
+    );
     assert_eq!(
         f.token.balance(&f.employer),
         employer_after_funding + (deposit - 3_000),
@@ -198,8 +202,14 @@ fn batch_pay_disburses_to_every_payee() {
         &f.token.address,
         &vec![
             &f.env,
-            Payment { to: a.clone(), amount: 700 },
-            Payment { to: b.clone(), amount: 300 },
+            Payment {
+                to: a.clone(),
+                amount: 700,
+            },
+            Payment {
+                to: b.clone(),
+                amount: 300,
+            },
         ],
     );
 

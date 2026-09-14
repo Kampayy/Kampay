@@ -240,7 +240,11 @@ fn mutual_cancellation_refunds_pending_milestones_only() {
 
     assert_eq!(refunded, 4_000, "only the untouched milestone comes back");
     assert_eq!(f.token.balance(&f.client), client_before + 4_000);
-    assert_eq!(f.token.balance(&f.provider), 6_000, "released work stays paid");
+    assert_eq!(
+        f.token.balance(&f.provider),
+        6_000,
+        "released work stays paid"
+    );
     assert_eq!(f.contract.get_escrow(&id).status, EscrowStatus::Cancelled);
 }
 
@@ -250,7 +254,10 @@ fn escrows_are_indexed_for_both_parties() {
     let id = f.open_funded(None);
 
     assert_eq!(f.contract.escrows_of_client(&f.client), vec![&f.env, id]);
-    assert_eq!(f.contract.escrows_of_provider(&f.provider), vec![&f.env, id]);
+    assert_eq!(
+        f.contract.escrows_of_provider(&f.provider),
+        vec![&f.env, id]
+    );
 }
 
 // ------------------------------------------------------------ failure cases

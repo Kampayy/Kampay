@@ -104,11 +104,8 @@ impl PayrollContract {
             return Err(Error::StreamCancelled);
         }
 
-        token::Client::new(&env, &stream.token).transfer(
-            &from,
-            &env.current_contract_address(),
-            &amount,
-        );
+        let contract = env.current_contract_address();
+        token::Client::new(&env, &stream.token).transfer(&from, &contract, &amount);
 
         stream.deposited += amount;
         save_stream(&env, stream_id, &stream);
@@ -139,11 +136,8 @@ impl PayrollContract {
         stream.withdrawn += amount;
         save_stream(&env, stream_id, &stream);
 
-        token::Client::new(&env, &stream.token).transfer(
-            &env.current_contract_address(),
-            &stream.worker,
-            &amount,
-        );
+        let contract = env.current_contract_address();
+        token::Client::new(&env, &stream.token).transfer(&contract, &stream.worker, &amount);
 
         Withdrawn {
             stream_id,
@@ -193,7 +187,9 @@ impl PayrollContract {
         let pause_start = core::cmp::max(stream.paused_at, stream.start);
         let resume_at = core::cmp::min(now, stream.end);
         if resume_at > pause_start {
-            stream.paused_seconds = stream.paused_seconds.saturating_add(resume_at - pause_start);
+            stream.paused_seconds = stream
+                .paused_seconds
+                .saturating_add(resume_at - pause_start);
         }
 
         stream.status = StreamStatus::Active;
@@ -360,7 +356,9 @@ fn next_stream_id(env: &Env) -> u64 {
     let key = DataKey::NextStreamId;
     let id: u64 = env.storage().instance().get(&key).unwrap_or(0);
     env.storage().instance().set(&key, &(id + 1));
-    env.storage().instance().extend_ttl(STREAM_TTL_THRESHOLD, STREAM_TTL);
+    env.storage()
+        .instance()
+        .extend_ttl(STREAM_TTL_THRESHOLD, STREAM_TTL);
     id
 }
 
