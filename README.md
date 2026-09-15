@@ -10,32 +10,10 @@ KamPay credit market.
 No trust assumptions. No chasing invoices. No two-week settlement windows.
 
 > **Status:** early development. The payroll, escrow, and credit contracts are written, tested
-> (57 tests), and building to WASM; the lending contract is designed but not yet implemented, and
-> nothing has been deployed to mainnet or audited. See the [roadmap](#roadmap) for what is done and
-> what is not.
-
+> (57 tests), and building to WASM; 
 ---
 
-## Table of Contents
 
-- [The Problem](#the-problem)
-- [How KamPay Works](#how-kampay-works)
-- [Core Modules](#core-modules)
-  - [Payroll Streams](#1-payroll-streams)
-  - [Milestone Escrow](#2-milestone-escrow)
-  - [Grace Periods & Disputes](#3-grace-periods--disputes)
-  - [On-Chain Credit Score](#4-on-chain-credit-score)
-  - [Lending Market](#5-lending-market)
-- [Why Stellar + Soroban](#why-stellar--soroban)
-- [Architecture](#architecture)
-- [Repository Layout](#repository-layout)
-- [Getting Started](#getting-started)
-- [Contract Interfaces](#contract-interfaces)
-- [Security Model](#security-model)
-- [Testing](#testing)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
 
 ---
 
