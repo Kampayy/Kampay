@@ -21,7 +21,7 @@ const REASONS = [
 
 export function StellarSection() {
   return (
-    <section id="stellar" className="scroll-mt-20 border-b border-line bg-sunken">
+    <section id="stellar" className="section-wash scroll-mt-20 border-b border-line bg-sunken">
       <Container className="py-16 sm:py-20">
         <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
           <SectionHeading

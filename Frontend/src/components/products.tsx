@@ -50,7 +50,7 @@ const PRODUCTS = [
 
 export function Products() {
   return (
-    <section id="products" className="scroll-mt-20 border-b border-line bg-sunken">
+    <section id="products" className="section-wash scroll-mt-20 border-b border-line bg-sunken">
       <Container className="py-16 sm:py-20">
         <SectionHeading
           eyebrow="Products"
