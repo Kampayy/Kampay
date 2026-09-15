@@ -2,18 +2,24 @@
 
 **Programmable payroll, escrow, and on-chain credit — built on Stellar with Soroban.**
 
-KamPay lets companies lock funds upfront and pay contributors automatically: recurring payroll for
-employees, escrow-based milestones for freelancers and contractors. Every payment builds a verifiable
-on-chain **credit score**, which unlocks access to under-collateralized loans from lenders in the
-KamPay credit market.
+KamPay is a payroll and escrow protocol built entirely on **Stellar**, with its contract logic
+written in **Soroban** — Stellar's Rust smart-contract environment.
 
-No trust assumptions. No chasing invoices. No two-week settlement windows.
+Companies lock funds upfront and contributors get paid automatically: recurring payroll streams for
+employees, milestone-based escrow for freelancers and contractors. Payments settle in Stellar USDC
+in three to five seconds, for a fraction of a cent, anywhere in the world, at any hour. Stellar
+Anchors carry the last mile — a contributor can move earnings into their own bank account in local
+currency without ever touching an exchange.
 
-> **Status:** early development. The payroll, escrow, and credit contracts are written, tested
-> (57 tests), and building to WASM; 
----
+Every settled payment writes to a verifiable **on-chain credit score** that lives on the Stellar
+ledger rather than in a KamPay database. That record is portable, public, and recomputable by
+anyone. It is what lets a contributor borrow against a history of being paid on time, instead of
+posting collateral they do not have.
 
+Everything runs on Stellar and nowhere else. The reasoning behind that narrowing is in
+[Why Stellar + Soroban](#why-stellar--soroban).
 
+No trust assumptions. No chasing invoices. No two-week settlement windows. No credit invisibility.
 
 ---
 
